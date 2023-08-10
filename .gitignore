@@ -1,0 +1,10 @@
+### Django ###
+*.log
+*.pot
+*.pyc
+__pycache__/
+staticfiles
+db.sqlite3
+node_modules
+env
+.env
