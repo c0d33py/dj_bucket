@@ -10,7 +10,9 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+from datetime import timedelta
 from pathlib import Path
+from typing import List, Tuple
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,7 +39,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'storages',
+    'minio_storage',
     'core',
 ]
 
@@ -122,16 +124,25 @@ STATICFILES_DIRS = [BASE_DIR / 'assets']
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
-DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
 
-AWS_ACCESS_KEY_ID = 'yGuB8wFbe8PYynVjsTS7'
-AWS_SECRET_ACCESS_KEY = 'UFQ6k5g07V1TR4nZy9o0c7oAkopiB2FqPMGSBgrr'
-AWS_STORAGE_BUCKET_NAME = 'djtest'
-AWS_S3_ENDPOINT_URL = 'http://192.168.10.6:9000'
-AWS_S3_OBJECT_PARAMETERS = {
-    'CacheControl': 'max-age=86400',
-}
-AWS_LOCATION = 'storage'
+# Django Minio settings Configuration
+# https://django-minio-storage.readthedocs.io/en/latest/usage/
+
+DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
+STATICFILES_STORAGE = "minio_storage.storage.MinioStaticStorage"
+# Use minio for django static and media file storage.
+MINIO_STORAGE_ENDPOINT = 'bucket.cb.media:9000'
+MINIO_STORAGE_ACCESS_KEY = 'wfaje5geEi7SIXiqBBZz'
+MINIO_STORAGE_SECRET_KEY = '2weZ4QSuhyhT0fKG0p6w9MlHOYkztREMrkTIop5o'
+MINIO_STORAGE_USE_HTTPS = True
+MINIO_STORAGE_MEDIA_OBJECT_METADATA = {"Cache-Control": "max-age=1000"}
+MINIO_STORAGE_MEDIA_BUCKET_NAME = 'cbs-media'
+MINIO_STORAGE_MEDIA_BACKUP_BUCKET = 'Recycle Bin'
+MINIO_STORAGE_MEDIA_BACKUP_FORMAT = '%c/'
+MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
+MINIO_STORAGE_STATIC_OBJECT_METADATA = {"Cache-Control": "max-age=1000"}
+MINIO_STORAGE_STATIC_BUCKET_NAME = 'cbs-static'
+MINIO_STORAGE_AUTO_CREATE_STATIC_BUCKET = True
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
