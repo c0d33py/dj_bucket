@@ -128,21 +128,24 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # Django Minio settings Configuration
 # https://django-minio-storage.readthedocs.io/en/latest/usage/
 
+# global config
 DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
 STATICFILES_STORAGE = "minio_storage.storage.MinioStaticStorage"
-# Use minio for django static and media file storage.
 MINIO_STORAGE_ENDPOINT = 'bucket.cb.media:9000'
+# security configs
 MINIO_STORAGE_ACCESS_KEY = 'wfaje5geEi7SIXiqBBZz'
 MINIO_STORAGE_SECRET_KEY = '2weZ4QSuhyhT0fKG0p6w9MlHOYkztREMrkTIop5o'
 MINIO_STORAGE_USE_HTTPS = True
-MINIO_STORAGE_MEDIA_OBJECT_METADATA = {"Cache-Control": "max-age=1000"}
-MINIO_STORAGE_MEDIA_BUCKET_NAME = 'cbs-media'
-MINIO_STORAGE_MEDIA_BACKUP_BUCKET = 'Recycle Bin'
-MINIO_STORAGE_MEDIA_BACKUP_FORMAT = '%c/'
+# Media files config
+MINIO_STORAGE_MEDIA_BUCKET_NAME = 'cbs0'
+MINIO_STORAGE_MEDIA_USE_PRESIGNED = True
 MINIO_STORAGE_AUTO_CREATE_MEDIA_BUCKET = True
-MINIO_STORAGE_STATIC_OBJECT_METADATA = {"Cache-Control": "max-age=1000"}
-MINIO_STORAGE_STATIC_BUCKET_NAME = 'cbs-static'
+MINIO_STORAGE_MEDIA_OBJECT_METADATA = {"Cache-Control": "max-age=1000"}
+# Static files config
+MINIO_STORAGE_STATIC_BUCKET_NAME = 'cbs0'
+MINIO_STORAGE_STATIC_USE_PRESIGNED = True
 MINIO_STORAGE_AUTO_CREATE_STATIC_BUCKET = True
+MINIO_STORAGE_STATIC_OBJECT_METADATA = {"Cache-Control": "max-age=1000"}
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
