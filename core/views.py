@@ -1,8 +1,11 @@
+from django.core.files.storage import default_storage
 from django.shortcuts import redirect, render
 from django.views.generic import View
+from rest_framework.generics import ListCreateAPIView
 
 from .forms import PostForm
-from .models import Post
+from .models import FileObject, Post
+from .serializers import FileObjectSerializer
 
 
 class PostView(View):
@@ -25,3 +28,16 @@ class PostView(View):
             return redirect('/')
 
         return render(request, self.template_name, {"form": form})
+
+
+class FileUploaderApi(ListCreateAPIView):
+    """Create file API View"""
+
+    serializer_class = FileObjectSerializer
+    queryset = FileObject.objects.all()
+
+    def get(self, request, *args, **kwargs):
+        client = default_storage.client
+
+        print('Client: ', client)
+        return super().get(request, *args, **kwargs)
