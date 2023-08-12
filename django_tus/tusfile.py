@@ -1,0 +1,215 @@
+import os
+import logging
+import random
+import string
+import uuid
+from dateutil import relativedelta
+
+from django.conf import settings
+from django.core.cache import cache
+from django.core.files.storage import FileSystemStorage
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+
+from rest_framework import status
+
+from django_tus.response import Tus404, TusResponse
+from django_tus.models import TusFileModel
+from django_tus.schema import get_schema_name
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+
+
+logger = logging.getLogger(__name__)
+
+
+class FilenameGenerator:
+    def __init__(self, filename: str = None):
+        if not filename or not isinstance(filename, str):
+            filename = self.random_string()
+        self.filename = filename
+
+    def get_name_and_extension(self):
+        return os.path.splitext(self.filename)
+
+    def create_random_name(self) -> str:
+        name, extension = self.get_name_and_extension()
+        random_string = FilenameGenerator.random_string()
+        return "".join((random_string, extension))
+
+    def create_random_suffix_name(self) -> str:
+        name, extension = self.get_name_and_extension()
+        random_string = FilenameGenerator.random_string()
+        return "".join((name, ".", random_string, extension))
+
+    @classmethod
+    def random_string(cls, length: int = 11) -> str:
+        letters_and_digits = string.ascii_letters + string.digits
+        return ''.join((random.choice(letters_and_digits) for i in range(length)))
+
+    def create_incremented_name(self) -> str:
+        index = 1
+        name, extension = self.get_name_and_extension()
+        while True:
+            filename = '{}.{:04d}{}'.format(name, index, extension)
+            index += 1
+            if not os.path.lexists(os.path.join(get_schema_name(), filename)):
+                break
+        return filename
+
+
+class TusFile:
+
+    def get_storage(self):
+        return FileSystemStorage()
+
+    def __init__(self, resource_id: str):
+        self.resource_id = resource_id
+        self.filename = cache.get("tus-uploads/{}/filename".format(resource_id))
+        self.file_size = int(cache.get("tus-uploads/{}/file_size".format(resource_id)))
+        self.metadata = cache.get("tus-uploads/{}/metadata".format(resource_id))
+        self.offset = cache.get("tus-uploads/{}/offset".format(resource_id))
+        # TODO: Check the schema name and make it configurable
+
+    @staticmethod
+    def get_tusfile_or_404(resource_id):
+        if TusFile.resource_exists(str(resource_id)):
+            return TusFile(resource_id)
+        else:
+            raise Tus404()
+
+    @staticmethod
+    def resource_exists(resource_id: str):
+        return cache.get("tus-uploads/{}/filename".format(resource_id), None) is not None
+
+    @staticmethod
+    def store_initial_file(resource_id: str, filename: str, file_size: int, offset: int, metadata: dict, path: str = None):
+        expires = timezone.now() + relativedelta.relativedelta(days=1)
+
+        store_file = TusFileModel()
+        store_file.guid = resource_id
+        store_file.filename = filename
+        store_file.length = file_size
+        store_file.offset = offset
+        store_file.metadata = metadata
+        store_file.expires_at = expires
+        store_file.tmp_path = path
+
+        store_file.save()
+        return store_file
+
+    @staticmethod
+    def create_initial_file(metadata, file_size: int):
+        resource_id = str(uuid.uuid4())
+        cache.add("tus-uploads/{}/filename".format(resource_id), "{}".format(metadata.get("filename")), settings.TUS_TIMEOUT)
+        cache.add("tus-uploads/{}/file_size".format(resource_id), file_size, settings.TUS_TIMEOUT)
+        cache.add("tus-uploads/{}/offset".format(resource_id), 0, settings.TUS_TIMEOUT)
+        cache.add("tus-uploads/{}/metadata".format(resource_id), metadata, settings.TUS_TIMEOUT)
+
+        tus_file = TusFile(resource_id)
+        tus_file.write_init_file()
+        # store initial file in database
+        tus_file.store_initial_file(resource_id, metadata.get("filename"), file_size, 0, metadata, tus_file.get_path())
+        return tus_file
+
+    def get_existing_object(self, resource_id):
+        return get_object_or_404(TusFileModel, guid=resource_id)
+
+    def is_valid(self):
+        return self.filename is not None and os.path.lexists(self.get_path())
+
+    def get_path(self):
+        return os.path.join(settings.TUS_UPLOAD_DIR, self.resource_id)
+
+    def rename(self):
+        setting = settings.TUS_FILE_NAME_FORMAT
+        store_file = self.get_existing_object(self.resource_id)
+
+        if setting == 'keep':
+            if self.check_existing_file(self.filename):
+                return TusResponse(status=status.HTTP_409_CONFLICT, reason="File already exists")
+        elif setting == 'random':
+            self.filename = FilenameGenerator(self.filename).create_random_name()
+        elif setting == 'random-suffix':
+            self.filename = FilenameGenerator(self.filename).create_random_suffix_name()
+        elif setting == 'increment':
+            self.filename = FilenameGenerator(self.filename).create_incremented_name()
+        else:
+            return ValueError()
+
+        store_file.expires_at = None
+        store_file.filename = self.filename
+        store_file.offset = self.offset
+        store_file.uploaded_file = os.path.join(get_schema_name(), self.filename)
+        store_file.save()
+
+        # Create a File object from the file path
+        file = ContentFile(open(self.get_path(), 'rb').read())
+
+        # Save the uploaded file to the path specified in the FileField's upload_to argument
+        default_storage.save(store_file.uploaded_file, file)
+
+        # Delete the temporary file
+        os.remove(self.get_path())
+
+    def clean(self):
+        cache.delete_many([
+            "tus-uploads/{}/file_size".format(self.resource_id),
+            "tus-uploads/{}/filename".format(self.resource_id),
+            "tus-uploads/{}/offset".format(self.resource_id),
+            "tus-uploads/{}/metadata".format(self.resource_id),
+        ])
+
+    @staticmethod
+    def check_existing_file(filename: str):
+        return os.path.lexists(os.path.join(get_schema_name(), filename))
+
+    def write_init_file(self):
+        try:
+            with open(self.get_path(), 'wb') as f:
+                f.seek(self.file_size - 1)
+                f.write(b'\0')
+        except IOError as e:
+            error_message = "Unable to create file: {}".format(e)
+            logger.error(error_message, exc_info=True)
+            return TusResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR, reason=error_message)
+
+    def write_chunk(self, chunk):
+        try:
+            with open(self.get_path(), 'r+b') as f:
+                f.seek(chunk.offset)
+                f.write(chunk.content)
+            self.offset = cache.incr("tus-uploads/{}/offset".format(self.resource_id), chunk.chunk_size)
+
+        except IOError:
+            logger.error("patch", extra={'request': chunk.META, 'tus': {
+                "resource_id": self.resource_id,
+                "filename": self.filename,
+                "file_size": self.file_size,
+                "metadata": self.metadata,
+                "offset": self.offset,
+                "upload_file_path": self.get_path(),
+            }})
+            return TusResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR, reason="Unable to write chunk")
+
+    def is_complete(self):
+        return self.offset == self.file_size
+
+    def __str__(self):
+        return "{} ({})".format(self.filename, self.resource_id)
+
+
+class TusInitFile:
+
+    def __init__(self, offset, chunk_size, content):
+        self.offset = offset
+        self.chunk_size = chunk_size
+        self.content = content
+
+
+class TusChunk:
+    def __init__(self, request):
+        self.META = request.META
+        self.offset = int(request.META.get("HTTP_UPLOAD_OFFSET", 0))
+        self.chunk_size = int(request.META.get("CONTENT_LENGTH", 102400))
+        self.content = request.body
