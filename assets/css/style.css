@@ -1,0 +1,73 @@
+body {
+    font-family: IBM Plex Sans, Helvetica Neue, Helvetica, Arial, sans-serif;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-font-smoothing: antialiased;
+}
+
+.container {
+    max-width: 900px !important;
+}
+
+a {
+    color: #009771;
+    text-decoration: none;
+}
+
+a:hover {
+    color: #009771;
+    text-decoration: underline;
+}
+
+a.btn {
+    margin-bottom: 5px;
+}
+
+.js-action-btn .btn {
+    background-color: transparent;
+    border: 1px solid #ddd;
+    color: #555;
+    letter-spacing: .1rem;
+    text-transform: uppercase;
+    white-space: nowrap;
+    outline: none !important;
+}
+
+.js-action-btn .btn:hover {
+    border: 1px solid rgb(184, 184, 184);
+}
+
+.js-action-btn .btn:hover,
+.js-action-btn .btn:focus {
+    box-shadow: none !important;
+}
+
+hr {
+    background-color: #bbb;
+}
+
+.upload-card {
+    background-color: #fafafa;
+    border: 1px solid #e1e1e1;
+    -webkit-border-radius: 7px;
+    border-radius: 7px;
+    overflow: hidden;
+    padding: 20px 25px 25px;
+}
+
+.heading {
+    font-size: 18px;
+    font-weight: 600;
+    line-height: 1.33;
+    margin-bottom: 10px;
+}
+
+.progress {
+    height: 38px;
+    margin-right: 10px;
+    background-color: #eeeeee;
+}
+
+.upload-text-progress {
+    line-height: 1.4;
+    margin-top: 1em;
+}
