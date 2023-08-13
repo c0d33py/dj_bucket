@@ -1,14 +1,18 @@
 import base64
 
-from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+from django.core.files.storage import FileSystemStorage, default_storage
 from django.shortcuts import redirect, render
 from django.views.generic import View
+from minio_storage.storage import MinioMediaStorage
+from pathvalidate._filename import is_valid_filename
 from rest_framework import metadata, permissions, status
 from rest_framework.metadata import BaseMetadata
 from rest_framework.views import APIView
 
 from .forms import PostForm
 from .models import FileObject, Post
+from .process import FileResource
 from .response import SecureResponse
 from .serializers import FileObjectSerializer
 
@@ -56,14 +60,38 @@ class FileUploaderApi(APIView):
     permission_classes = [permissions.AllowAny]
     metadata_class = CustomMetadata
 
+    def get(self, request, *args, **kwargs):
+        # file = ContentFile("Some text", name="data.txt")
+
+        # # file_name = default_storage.delete(file.name, file)
+
+        # # file = default_storage.listdir('upload')
+        # file_url = default_storage.save(file.name, file)
+        # print(file_url)
+
+        return SecureResponse(status=status.HTTP_200_OK)
+
+    def get_metadata(self, request):
+        meta = self.metadata_class()
+        return meta.determine_metadata(request, self)
+
     def options(self, request, *args, **kwargs):
         return SecureResponse(status=status.HTTP_204_NO_CONTENT)
 
     def post(self, request, *args, **kwargs):
-        custom_metadata = self.metadata_class()
-        metadata = custom_metadata.determine_metadata(request, self)
-        print(request.META)
-        return SecureResponse(status=status.HTTP_201_CREATED)
+        metadata = self.get_metadata(request)
+
+        file_size = int(request.META.get("HTTP_UPLOAD_LENGTH", "0"))
+        tus_file = FileResource.create_initial_file(metadata, file_size)
+
+        return SecureResponse(
+            status=status.HTTP_201_CREATED,
+            headers={
+                'Location': '{}{}'.format(
+                    request.build_absolute_uri(), tus_file.resource_id
+                )
+            },
+        )
 
     def patch(self, request, *args, **kwargs):
         return SecureResponse(status=status.HTTP_204_NO_CONTENT)
