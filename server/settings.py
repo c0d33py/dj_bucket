@@ -9,7 +9,7 @@ https://docs.djangoproject.com/en/4.2/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
-
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'corsheaders',
     'rest_framework',
     'minio_storage',
+    'django_tus',
     'core',
 ]
 
@@ -125,6 +126,17 @@ STATICFILES_DIRS = [BASE_DIR / 'assets']
 
 MEDIA_URL = 'media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+
+# Django Max Upload Size
+DATA_UPLOAD_MAX_MEMORY_SIZE = 4294967296  # 4GB
+
+# Django Tus Upload Config
+TUS_UPLOAD_DIR = 'tus_upload'
+TUS_DESTINATION_DIR = os.path.join(BASE_DIR, 'media', 'uploads')
+TUS_FINAL_DIR = 'uploads/'
+TUS_FILE_NAME_FORMAT = 'random'  # Other options are: 'random-suffix', 'random', 'keep'
+TUS_EXISTING_FILE = 'random'  # Other options are: 'overwrite',  'error', 'rename'
 
 # Django Minio settings Configuration
 # https://django-minio-storage.readthedocs.io/en/latest/usage/
