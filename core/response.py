@@ -1,5 +1,4 @@
 import re
-from email import header
 
 from rest_framework import status
 from rest_framework.exceptions import APIException
