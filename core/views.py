@@ -1,5 +1,6 @@
 import base64
 
+from django.conf import settings
 from django.core.files.base import ContentFile
 from django.core.files.storage import FileSystemStorage, default_storage
 from django.shortcuts import redirect, render
@@ -60,17 +61,6 @@ class FileUploaderApi(APIView):
     permission_classes = [permissions.AllowAny]
     metadata_class = CustomMetadata
 
-    def get(self, request, *args, **kwargs):
-        # file = ContentFile("Some text", name="data.txt")
-
-        # # file_name = default_storage.delete(file.name, file)
-
-        # # file = default_storage.listdir('upload')
-        # file_url = default_storage.save(file.name, file)
-        # print(file_url)
-
-        return SecureResponse(status=status.HTTP_200_OK)
-
     def get_metadata(self, request):
         meta = self.metadata_class()
         return meta.determine_metadata(request, self)
@@ -82,16 +72,36 @@ class FileUploaderApi(APIView):
         metadata = self.get_metadata(request)
 
         file_size = int(request.META.get("HTTP_UPLOAD_LENGTH", "0"))
-        tus_file = FileResource.create_initial_file(metadata, file_size)
+        file = FileResource.create_initial_file(metadata, file_size)
+        client = default_storage.client
+
+        object_url = client.presigned_get_object(
+            settings.MINIO_STORAGE_MEDIA_BUCKET_NAME,
+            file.resource_id,
+        )
 
         return SecureResponse(
             status=status.HTTP_201_CREATED,
+            # headers={'Location': '{}'.format(object_url)},
             headers={
                 'Location': '{}{}'.format(
-                    request.build_absolute_uri(), tus_file.resource_id
+                    request.build_absolute_uri(), file.resource_id
                 )
             },
         )
 
-    def patch(self, request, *args, **kwargs):
+    def head(self, request, resource_id):
+        file = FileResource.get_file_or_404(str(resource_id))
+        print('Head: ', file)
+        return SecureResponse(
+            status=status.HTTP_200_OK,
+            headers={
+                'Upload-Offset': file.offset,
+                'Upload-Length': file.file_size,
+            },
+        )
+
+    def patch(self, request, resource_id, *args, **kwargs):
+        file = FileResource.get_file_or_404(str(resource_id))
+        print(file)
         return SecureResponse(status=status.HTTP_204_NO_CONTENT)

@@ -1,13 +1,13 @@
+import io
 import logging
 import os
 import uuid
+from unittest import result
 
-from dateutil import relativedelta
 from django.conf import settings
 from django.core.cache import cache
 from django.core.files.storage import FileSystemStorage, default_storage
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from rest_framework import status
 
 from .response import Secure404, SecureResponse
@@ -18,6 +18,8 @@ logger = logging.getLogger(__name__)
 class FileResource:
     def __init__(self, resource_id):
         self.resource_id = resource_id
+        self.client = default_storage.client
+        self.bucket = settings.MINIO_STORAGE_MEDIA_BUCKET_NAME
         self._load_file_info()
 
     def _load_file_info(self):
@@ -28,6 +30,8 @@ class FileResource:
 
     @staticmethod
     def get_file_or_404(resource_id):
+        print('resource get or 404: ', resource_id)
+
         if FileResource.resource_exists(str(resource_id)):
             return FileResource(resource_id)
         else:
@@ -35,6 +39,7 @@ class FileResource:
 
     @staticmethod
     def resource_exists(resource_id: str):
+        print('Resource Exist: ', resource_id)
         return cache.get(f"uploads/{resource_id}/filename", None) is not None
 
     @staticmethod
@@ -66,30 +71,35 @@ class FileResource:
             # with open(self.get_path(), 'wb') as f:
             #     f.seek(self.file_size - 1)
             #     f.write(b'\0')
-
-            # file_path = 'upload/'
-            # with default_storage.save(file_path, 'wb') as f:
-            #     f.seek(self.file_size - 1)
-            #     f.write(b'\0')
-
-            file_name = default_storage.save(file.name, file)
-            file = default_storage.open(file_name)
-
+            self.client.put_object(
+                self.bucket,
+                self.resource_id,
+                io.BytesIO(b'\0'),
+                1,
+            )
         except IOError as e:
             error_message = f"Unable to create file: {e}"
             logger.error(error_message, exc_info=True)
             return SecureResponse(
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                reason=error_message,
             )
 
     def write_chunk(self, chunk):
         try:
-            with open(self.get_path(), 'r+b') as f:
-                f.seek(chunk.offset)
-                f.write(chunk.content)
+            # with open(self.get_path(), 'r+b') as f:
+            #     f.seek(chunk.offset)
+            #     f.write(chunk.content)
+            # Upload the chunk to MinIO
+            self.client.put_object(
+                self.bucket,
+                self.resource_id,
+                io.BytesIO(chunk.content),
+                chunk.chunk_size,
+                part_number=chunk.chunk_number,
+            )
 
-            offset_key = f"tus-uploads/{self.resource_id}/offset"
+            offset_key = f"uploads/{self.resource_id}/offset"
+
             self.offset = cache.incr(offset_key, chunk.chunk_size)
 
         except IOError:
