@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title></title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-4bw+/aepP/YC94hEpVNVgiZdgIC5+VKNBQNGCHeKRQN+PtmoHDEXuppvnDJzQIu9" crossorigin="anonymous">
+    <link href="https://releases.transloadit.com/uppy/v3.14.0/uppy.min.css" rel="stylesheet" />
+</head>
+
+<body class="container mt-5">
+    <h5>You need JavaScript enabled for this example to work.</h5>
+    <button type="button" id="uppyModalOpener" class="btn btn-primary">Open Modal</button>
+
+
+
+    <script type="module">
+        import {
+            Uppy,
+            Dashboard,
+            Tus,
+            AwsS3
+        } from "https://releases.transloadit.com/uppy/v3.14.0/uppy.min.mjs";
+
+        const uppy = new Uppy({ debug: true, autoProceed: false })
+            .use(Dashboard, { trigger: "#uppyModalOpener" })
+            // .use(Tus, { endpoint: "https://tusd.tusdemo.net/files/" })
+            .use(AwsS3, {
+                shouldUseMultipart: (file) => file.size > 100 * 2 ** 20,
+                companionUrl: 'https://bucket.cb.media:9000',
+            });
+
+        uppy.on("success", (fileCount) => {
+            console.log(`${fileCount} files uploaded`);
+        });
+    </script>
+</body>
+
+</html>
