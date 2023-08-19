@@ -2,12 +2,10 @@ import io
 import logging
 import os
 import uuid
-from unittest import result
 
 from django.conf import settings
 from django.core.cache import cache
-from django.core.files.storage import FileSystemStorage, default_storage
-from django.shortcuts import get_object_or_404
+from django.core.files.storage import default_storage
 from rest_framework import status
 
 from .response import Secure404, SecureResponse
@@ -68,12 +66,11 @@ class FileResource:
 
     def write_init_file(self):
         try:
-            # with open(self.get_path(), 'wb') as f:
-            #     f.seek(self.file_size - 1)
-            #     f.write(b'\0')
+            object_name = f"uploads/{self.resource_id}/{self.filename}"
+
             self.client.put_object(
                 self.bucket,
-                self.resource_id,
+                object_name,
                 io.BytesIO(b'\0'),
                 1,
             )
@@ -81,30 +78,31 @@ class FileResource:
             error_message = f"Unable to create file: {e}"
             logger.error(error_message, exc_info=True)
             return SecureResponse(
+                {'error': 'Internal server error'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def write_chunk(self, chunk):
         try:
-            # with open(self.get_path(), 'r+b') as f:
-            #     f.seek(chunk.offset)
-            #     f.write(chunk.content)
+            object_name = f"uploads/{self.resource_id}/{self.filename}"
+            offset_key = f"uploads/{self.resource_id}/offset"
+            chunk_offset = cache.get(offset_key, default=0)
+
             # Upload the chunk to MinIO
             self.client.put_object(
                 self.bucket,
-                self.resource_id,
+                object_name,
                 io.BytesIO(chunk.content),
                 chunk.chunk_size,
                 part_number=chunk.chunk_number,
             )
 
-            offset_key = f"uploads/{self.resource_id}/offset"
+            # Update the offset in cache
+            cache.set(offset_key, chunk_offset + chunk.chunk_size)
 
-            self.offset = cache.incr(offset_key, chunk.chunk_size)
-
-        except IOError:
+        except IOError as e:
             logger.error(
-                "patch",
+                "write_chunk",
                 extra={
                     'request': chunk.META,
                     'tus': {
@@ -118,6 +116,6 @@ class FileResource:
                 },
             )
             return SecureResponse(
+                {'error': 'Unable to write chunk'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                reason="Unable to write chunk",
             )

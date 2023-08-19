@@ -1,21 +1,20 @@
 import base64
+from os import PathLike, fspath
 
 from django.conf import settings
-from django.core.files.base import ContentFile
-from django.core.files.storage import FileSystemStorage, default_storage
+from django.core.files.storage import default_storage
 from django.shortcuts import redirect, render
 from django.views.generic import View
-from minio_storage.storage import MinioMediaStorage
-from pathvalidate._filename import is_valid_filename
-from rest_framework import metadata, permissions, status
-from rest_framework.metadata import BaseMetadata
+from rest_framework import permissions, status
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .forms import PostForm
-from .models import FileObject, Post
+from .metadata import CustomMetadata
+from .minio import S3MinioStorage
+from .models import Post
 from .process import FileResource
 from .response import SecureResponse
-from .serializers import FileObjectSerializer
 
 
 class PostView(View):
@@ -25,6 +24,10 @@ class PostView(View):
     def get(self, request):
         post_query = Post.objects.all()
         form = self.form_class()
+
+        client = S3MinioStorage()
+
+        print(client.client)
 
         context = {'posts': post_query, 'form': form}
         return render(request, self.template_name, context)
@@ -38,21 +41,6 @@ class PostView(View):
             return redirect('/')
 
         return render(request, self.template_name, {"form": form})
-
-
-class CustomMetadata(BaseMetadata):
-    def determine_metadata(self, request, view):
-        metadata = {}
-
-        upload_metadata = request.META.get("HTTP_UPLOAD_METADATA")
-
-        if upload_metadata:
-            for kv in upload_metadata.split(","):
-                key, value = kv.split(" ", 1) if " " in kv else (kv, "")
-                decoded_value = base64.b64decode(value).decode()
-                metadata[key] = decoded_value
-
-        return metadata
 
 
 class FileUploaderApi(APIView):
@@ -70,24 +58,21 @@ class FileUploaderApi(APIView):
 
     def post(self, request, *args, **kwargs):
         metadata = self.get_metadata(request)
+        file_name = fspath(metadata.get('filename'))
+        print(isinstance(file_name, PathLike))
 
         file_size = int(request.META.get("HTTP_UPLOAD_LENGTH", "0"))
         file = FileResource.create_initial_file(metadata, file_size)
         client = default_storage.client
-
-        object_url = client.presigned_get_object(
+        object_url = client.get_presigned_url(
+            'GET',
             settings.MINIO_STORAGE_MEDIA_BUCKET_NAME,
             file.resource_id,
         )
 
         return SecureResponse(
             status=status.HTTP_201_CREATED,
-            # headers={'Location': '{}'.format(object_url)},
-            headers={
-                'Location': '{}{}'.format(
-                    request.build_absolute_uri(), file.resource_id
-                )
-            },
+            headers={'Location': '{}'.format(object_url)},
         )
 
     def head(self, request, resource_id):
@@ -105,3 +90,11 @@ class FileUploaderApi(APIView):
         file = FileResource.get_file_or_404(str(resource_id))
         print(file)
         return SecureResponse(status=status.HTTP_204_NO_CONTENT)
+
+
+class Chunk:
+    def __init__(self, request):
+        self.META = request.META
+        self.chunk_number = int(request.META.get('HTTP_UPLOAD_OFFSET', 0))
+        self.chunk_size = int(request.META.get("CONTENT_LENGTH", 102400))
+        self.content = request.body
