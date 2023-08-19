@@ -1,16 +1,15 @@
 import os
-import uuid
 
 import boto3
+from django.conf import settings
 
 
 class S3Client:
     def __init__(self, *args, **kwargs):
-        self.key = uuid.uuid4()
-        self.bucket_name = 'cbs0'
-        self.access_key = os.getenv('AWS_ACCESS_KEY')
-        self.secret_key = os.getenv('AWS_SECRET_ACCESS_KEY')
-        self.endpoint_url = os.getenv('AWS_DOMAIN')
+        self.bucket_name = settings.MINIO_STORAGE_MEDIA_BUCKET_NAME
+        self.access_key = settings.MINIO_STORAGE_ACCESS_KEY
+        self.secret_key = settings.MINIO_STORAGE_SECRET_KEY
+        self.endpoint_url = f'https://{settings.MINIO_STORAGE_ENDPOINT}'
         self.region_name = ''
         self.s3 = self._create_s3_client()
 
@@ -22,13 +21,13 @@ class S3Client:
             endpoint_url=self.endpoint_url,
         )
 
-    def get_multipart(self, file_name, file_type):
+    def get_multipart_upload(self, resource_id, content_type):
         # Initialize a multipart upload
         response = self.s3.create_multipart_upload(
             Bucket=self.bucket_name,
-            Key=file_name,
+            Key=resource_id,
             ACL="public-read-write",
-            ContentType=file_type,
+            ContentType=content_type,
             CacheControl="max-age=1000",
         )
         upload_id = response['UploadId']

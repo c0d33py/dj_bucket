@@ -1,20 +1,14 @@
-import base64
-from os import PathLike, fspath
-
-from django.conf import settings
-from django.core.files.storage import default_storage
 from django.shortcuts import redirect, render
 from django.views.generic import View
 from rest_framework import permissions, status
-from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .bucket import S3Client
 from .forms import PostForm
 from .metadata import CustomMetadata
-from .minio import S3MinioStorage
 from .models import Post
 from .process import FileResource
-from .response import SecureResponse
+from .response import TusResponse
 
 
 class PostView(View):
@@ -24,10 +18,6 @@ class PostView(View):
     def get(self, request):
         post_query = Post.objects.all()
         form = self.form_class()
-
-        client = S3MinioStorage()
-
-        print(client.client)
 
         context = {'posts': post_query, 'form': form}
         return render(request, self.template_name, context)
@@ -54,31 +44,30 @@ class FileUploaderApi(APIView):
         return meta.determine_metadata(request, self)
 
     def options(self, request, *args, **kwargs):
-        return SecureResponse(status=status.HTTP_204_NO_CONTENT)
+        return TusResponse(status=status.HTTP_204_NO_CONTENT)
 
     def post(self, request, *args, **kwargs):
         metadata = self.get_metadata(request)
-        file_name = fspath(metadata.get('filename'))
-        print(isinstance(file_name, PathLike))
 
+        content_type = metadata.get('filetype', None)
         file_size = int(request.META.get("HTTP_UPLOAD_LENGTH", "0"))
-        file = FileResource.create_initial_file(metadata, file_size)
-        client = default_storage.client
-        object_url = client.get_presigned_url(
-            'GET',
-            settings.MINIO_STORAGE_MEDIA_BUCKET_NAME,
-            file.resource_id,
-        )
 
-        return SecureResponse(
+        file = FileResource.create_initial_file(metadata, file_size)
+
+        s3 = S3Client()
+
+        upload_id = s3.get_multipart_upload(file.resource_id, content_type)
+        print(upload_id)
+
+        return TusResponse(
             status=status.HTTP_201_CREATED,
-            headers={'Location': '{}'.format(object_url)},
+            # headers={'Location': '{}'.format(object_url)},
         )
 
     def head(self, request, resource_id):
         file = FileResource.get_file_or_404(str(resource_id))
         print('Head: ', file)
-        return SecureResponse(
+        return TusResponse(
             status=status.HTTP_200_OK,
             headers={
                 'Upload-Offset': file.offset,
@@ -88,8 +77,8 @@ class FileUploaderApi(APIView):
 
     def patch(self, request, resource_id, *args, **kwargs):
         file = FileResource.get_file_or_404(str(resource_id))
-        print(file)
-        return SecureResponse(status=status.HTTP_204_NO_CONTENT)
+
+        return TusResponse(status=status.HTTP_204_NO_CONTENT)
 
 
 class Chunk:

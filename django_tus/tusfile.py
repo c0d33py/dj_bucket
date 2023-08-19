@@ -1,24 +1,21 @@
-import os
 import logging
+import os
 import random
 import string
 import uuid
-from dateutil import relativedelta
 
+from dateutil import relativedelta
 from django.conf import settings
 from django.core.cache import cache
-from django.core.files.storage import FileSystemStorage
+from django.core.files.base import ContentFile
+from django.core.files.storage import FileSystemStorage, default_storage
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-
 from rest_framework import status
 
-from django_tus.response import Tus404, TusResponse
 from django_tus.models import TusFileModel
+from django_tus.response import Tus404, TusResponse
 from django_tus.schema import get_schema_name
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
-
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +56,6 @@ class FilenameGenerator:
 
 
 class TusFile:
-
     def get_storage(self):
         return FileSystemStorage()
 
@@ -80,10 +76,19 @@ class TusFile:
 
     @staticmethod
     def resource_exists(resource_id: str):
-        return cache.get("tus-uploads/{}/filename".format(resource_id), None) is not None
+        return (
+            cache.get("tus-uploads/{}/filename".format(resource_id), None) is not None
+        )
 
     @staticmethod
-    def store_initial_file(resource_id: str, filename: str, file_size: int, offset: int, metadata: dict, path: str = None):
+    def store_initial_file(
+        resource_id: str,
+        filename: str,
+        file_size: int,
+        offset: int,
+        metadata: dict,
+        path: str = None,
+    ):
         expires = timezone.now() + relativedelta.relativedelta(days=1)
 
         store_file = TusFileModel()
@@ -101,15 +106,34 @@ class TusFile:
     @staticmethod
     def create_initial_file(metadata, file_size: int):
         resource_id = str(uuid.uuid4())
-        cache.add("tus-uploads/{}/filename".format(resource_id), "{}".format(metadata.get("filename")), settings.TUS_TIMEOUT)
-        cache.add("tus-uploads/{}/file_size".format(resource_id), file_size, settings.TUS_TIMEOUT)
+        cache.add(
+            "tus-uploads/{}/filename".format(resource_id),
+            "{}".format(metadata.get("filename")),
+            settings.TUS_TIMEOUT,
+        )
+        cache.add(
+            "tus-uploads/{}/file_size".format(resource_id),
+            file_size,
+            settings.TUS_TIMEOUT,
+        )
         cache.add("tus-uploads/{}/offset".format(resource_id), 0, settings.TUS_TIMEOUT)
-        cache.add("tus-uploads/{}/metadata".format(resource_id), metadata, settings.TUS_TIMEOUT)
+        cache.add(
+            "tus-uploads/{}/metadata".format(resource_id),
+            metadata,
+            settings.TUS_TIMEOUT,
+        )
 
         tus_file = TusFile(resource_id)
         tus_file.write_init_file()
         # store initial file in database
-        tus_file.store_initial_file(resource_id, metadata.get("filename"), file_size, 0, metadata, tus_file.get_path())
+        tus_file.store_initial_file(
+            resource_id,
+            metadata.get("filename"),
+            file_size,
+            0,
+            metadata,
+            tus_file.get_path(),
+        )
         return tus_file
 
     def get_existing_object(self, resource_id):
@@ -127,7 +151,9 @@ class TusFile:
 
         if setting == 'keep':
             if self.check_existing_file(self.filename):
-                return TusResponse(status=status.HTTP_409_CONFLICT, reason="File already exists")
+                return TusResponse(
+                    status=status.HTTP_409_CONFLICT, reason="File already exists"
+                )
         elif setting == 'random':
             self.filename = FilenameGenerator(self.filename).create_random_name()
         elif setting == 'random-suffix':
@@ -153,12 +179,14 @@ class TusFile:
         os.remove(self.get_path())
 
     def clean(self):
-        cache.delete_many([
-            "tus-uploads/{}/file_size".format(self.resource_id),
-            "tus-uploads/{}/filename".format(self.resource_id),
-            "tus-uploads/{}/offset".format(self.resource_id),
-            "tus-uploads/{}/metadata".format(self.resource_id),
-        ])
+        cache.delete_many(
+            [
+                "tus-uploads/{}/file_size".format(self.resource_id),
+                "tus-uploads/{}/filename".format(self.resource_id),
+                "tus-uploads/{}/offset".format(self.resource_id),
+                "tus-uploads/{}/metadata".format(self.resource_id),
+            ]
+        )
 
     @staticmethod
     def check_existing_file(filename: str):
@@ -167,30 +195,46 @@ class TusFile:
     def write_init_file(self):
         try:
             with open(self.get_path(), 'wb') as f:
-                f.seek(self.file_size - 1)
-                f.write(b'\0')
+                if self.file_size != 0:
+                    f.seek(self.file_size - 1)
+                    f.write(b'\0')
         except IOError as e:
             error_message = "Unable to create file: {}".format(e)
             logger.error(error_message, exc_info=True)
-            return TusResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR, reason=error_message)
+            return TusResponse(
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                reason=error_message,
+            )
 
     def write_chunk(self, chunk):
         try:
             with open(self.get_path(), 'r+b') as f:
                 f.seek(chunk.offset)
                 f.write(chunk.content)
-            self.offset = cache.incr("tus-uploads/{}/offset".format(self.resource_id), chunk.chunk_size)
+            self.offset = cache.incr(
+                "tus-uploads/{}/offset".format(self.resource_id),
+                chunk.chunk_size,
+            )
 
         except IOError:
-            logger.error("patch", extra={'request': chunk.META, 'tus': {
-                "resource_id": self.resource_id,
-                "filename": self.filename,
-                "file_size": self.file_size,
-                "metadata": self.metadata,
-                "offset": self.offset,
-                "upload_file_path": self.get_path(),
-            }})
-            return TusResponse(status=status.HTTP_500_INTERNAL_SERVER_ERROR, reason="Unable to write chunk")
+            logger.error(
+                "patch",
+                extra={
+                    'request': chunk.META,
+                    'tus': {
+                        "resource_id": self.resource_id,
+                        "filename": self.filename,
+                        "file_size": self.file_size,
+                        "metadata": self.metadata,
+                        "offset": self.offset,
+                        "upload_file_path": self.get_path(),
+                    },
+                },
+            )
+            return TusResponse(
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                reason="Unable to write chunk",
+            )
 
     def is_complete(self):
         return self.offset == self.file_size
@@ -200,7 +244,6 @@ class TusFile:
 
 
 class TusInitFile:
-
     def __init__(self, offset, chunk_size, content):
         self.offset = offset
         self.chunk_size = chunk_size

@@ -8,7 +8,7 @@ from django.core.cache import cache
 from django.core.files.storage import default_storage
 from rest_framework import status
 
-from .response import Secure404, SecureResponse
+from .response import Tus404, TusResponse
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class FileResource:
         if FileResource.resource_exists(str(resource_id)):
             return FileResource(resource_id)
         else:
-            raise Secure404()
+            raise Tus404()
 
     @staticmethod
     def resource_exists(resource_id: str):
@@ -77,7 +77,7 @@ class FileResource:
         except IOError as e:
             error_message = f"Unable to create file: {e}"
             logger.error(error_message, exc_info=True)
-            return SecureResponse(
+            return TusResponse(
                 {'error': 'Internal server error'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
@@ -115,7 +115,7 @@ class FileResource:
                     },
                 },
             )
-            return SecureResponse(
+            return TusResponse(
                 {'error': 'Unable to write chunk'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

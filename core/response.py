@@ -1,23 +1,14 @@
 import re
 
-from rest_framework import status
-from rest_framework.exceptions import APIException
+from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 
 tus_api_version = '1.0.0'
-tus_api_version_supported = [
-    '1.0.0',
-]
+tus_api_version_supported = ['1.0.0']
 tus_api_extensions = ['creation', 'termination', 'file-check']
 
 
-class NotFound(APIException):
-    status_code = status.HTTP_404_NOT_FOUND
-    default_detail = 'Not found.'
-    default_code = 'not_found'
-
-
-class SecureResponse(Response):
+class TusResponse(Response):
     def __init__(self, headers=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
@@ -26,6 +17,8 @@ class SecureResponse(Response):
             'Tus-Version': ",".join(tus_api_version_supported),
             'Tus-Extension': ",".join(tus_api_extensions),
             # 'Tus-Max-Size': settings.TUS_MAX_FILE_SIZE, TODO: Need to be checked the file size
+            'Access-Control-Allow-Origin': "*",
+            'Access-Control-Allow-Methods': "PATCH,HEAD,GET,POST,OPTIONS",
             'Access-Control-Expose-Headers': "Tus-Resumable,upload-length,upload-metadata,Location,Upload-Offset",
             'Access-Control-Allow-Headers': "Tus-Resumable,upload-length,upload-metadata,Location,Upload-Offset,content-type",
             'Cache-Control': 'no-store',
@@ -46,5 +39,5 @@ class SecureResponse(Response):
             self.__setitem__(key, value)
 
 
-class Secure404(SecureResponse, NotFound):
+class Tus404(TusResponse, NotFound):
     pass
