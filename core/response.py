@@ -18,7 +18,7 @@ class TusResponse(Response):
             'Tus-Extension': ",".join(tus_api_extensions),
             # 'Tus-Max-Size': settings.TUS_MAX_FILE_SIZE, TODO: Need to be checked the file size
             'Access-Control-Allow-Origin': "*",
-            'Access-Control-Allow-Methods': "PATCH,HEAD,GET,POST,OPTIONS",
+            # 'Access-Control-Allow-Methods': "PATCH,HEAD,GET,POST,OPTIONS",
             'Access-Control-Expose-Headers': "Tus-Resumable,upload-length,upload-metadata,Location,Upload-Offset",
             'Access-Control-Allow-Headers': "Tus-Resumable,upload-length,upload-metadata,Location,Upload-Offset,content-type",
             'Cache-Control': 'no-store',

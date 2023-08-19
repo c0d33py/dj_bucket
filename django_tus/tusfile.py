@@ -1,6 +1,7 @@
 import logging
 import os
 import random
+import shutil
 import string
 import uuid
 
@@ -65,7 +66,6 @@ class TusFile:
         self.file_size = int(cache.get("tus-uploads/{}/file_size".format(resource_id)))
         self.metadata = cache.get("tus-uploads/{}/metadata".format(resource_id))
         self.offset = cache.get("tus-uploads/{}/offset".format(resource_id))
-        # TODO: Check the schema name and make it configurable
 
     @staticmethod
     def get_tusfile_or_404(resource_id):
@@ -79,29 +79,6 @@ class TusFile:
         return (
             cache.get("tus-uploads/{}/filename".format(resource_id), None) is not None
         )
-
-    @staticmethod
-    def store_initial_file(
-        resource_id: str,
-        filename: str,
-        file_size: int,
-        offset: int,
-        metadata: dict,
-        path: str = None,
-    ):
-        expires = timezone.now() + relativedelta.relativedelta(days=1)
-
-        store_file = TusFileModel()
-        store_file.guid = resource_id
-        store_file.filename = filename
-        store_file.length = file_size
-        store_file.offset = offset
-        store_file.metadata = metadata
-        store_file.expires_at = expires
-        store_file.tmp_path = path
-
-        store_file.save()
-        return store_file
 
     @staticmethod
     def create_initial_file(metadata, file_size: int):
@@ -125,19 +102,8 @@ class TusFile:
 
         tus_file = TusFile(resource_id)
         tus_file.write_init_file()
-        # store initial file in database
-        tus_file.store_initial_file(
-            resource_id,
-            metadata.get("filename"),
-            file_size,
-            0,
-            metadata,
-            tus_file.get_path(),
-        )
-        return tus_file
 
-    def get_existing_object(self, resource_id):
-        return get_object_or_404(TusFileModel, guid=resource_id)
+        return tus_file
 
     def is_valid(self):
         return self.filename is not None and os.path.lexists(self.get_path())
@@ -147,7 +113,6 @@ class TusFile:
 
     def rename(self):
         setting = settings.TUS_FILE_NAME_FORMAT
-        store_file = self.get_existing_object(self.resource_id)
 
         if setting == 'keep':
             if self.check_existing_file(self.filename):
@@ -163,20 +128,9 @@ class TusFile:
         else:
             return ValueError()
 
-        store_file.expires_at = None
-        store_file.filename = self.filename
-        store_file.offset = self.offset
-        store_file.uploaded_file = os.path.join(get_schema_name(), self.filename)
-        store_file.save()
-
-        # Create a File object from the file path
-        file = ContentFile(open(self.get_path(), 'rb').read())
-
-        # Save the uploaded file to the path specified in the FileField's upload_to argument
-        default_storage.save(store_file.uploaded_file, file)
-
-        # Delete the temporary file
-        os.remove(self.get_path())
+        shutil.move(
+            self.get_path(), os.path.join(settings.TUS_DESTINATION_DIR, self.filename)
+        )
 
     def clean(self):
         cache.delete_many(

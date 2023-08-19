@@ -4,15 +4,16 @@ import zipfile
 
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
-from pathvalidate._filename import is_valid_filename
 from rest_framework import generics, permissions, status, views
 from rest_framework.response import Response
 
 from django_tus.conf import settings
+from django_tus.metadata import TusMetadata
 from django_tus.models import TusFileModel
 from django_tus.response import TusResponse
 from django_tus.serializers import TusFileSerializer
-from django_tus.tusfile import FilenameGenerator, TusChunk, TusFile
+from django_tus.tusfile import TusChunk, TusFile
+from django_tus.utils import validate_filename
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,7 @@ class TusUpload(views.APIView):
     """Upload file to server"""
 
     permission_classes = [permissions.IsAuthenticated]
+    metadata_class = TusMetadata
 
     on_finish = None
 
@@ -43,27 +45,15 @@ class TusUpload(views.APIView):
             self.on_finish()
 
     def get_metadata(self, request):
-        metadata = {}
-        if request.META.get("HTTP_UPLOAD_METADATA"):
-            for kv in request.META.get("HTTP_UPLOAD_METADATA").split(","):
-                splited_metadata = kv.split(" ")
-                if len(splited_metadata) == 2:
-                    key, value = splited_metadata
-                    value = base64.b64decode(value)
-                    if isinstance(value, bytes):
-                        value = value.decode()
-                    metadata[key] = value
-                else:
-                    metadata[splited_metadata[0]] = ""
-        return metadata
+        meta = self.metadata_class()
+        return meta.determine_metadata(request, self)
 
     def options(self, request, *args, **kwargs):
         return TusResponse(status=status.HTTP_204_NO_CONTENT)
 
     def post(self, request, *args, **kwargs):
         metadata = self.get_metadata(request)
-
-        metadata["filename"] = self.validate_filename(metadata)
+        metadata["filename"] = validate_filename(metadata)
 
         message_id = request.META.get("HTTP_MESSAGE_ID")
         if message_id:
@@ -130,12 +120,6 @@ class TusUpload(views.APIView):
             status=status.HTTP_204_NO_CONTENT,
             extra_headers={'Upload-Offset': tus_file.offset},
         )
-
-    def validate_filename(self, metadata):
-        filename = metadata.get("filename", "")
-        if not is_valid_filename(filename):
-            filename = FilenameGenerator.random_string(16)
-        return filename
 
     def delete(self, request, resource_id, *args, **kwargs):
         try:
