@@ -14,9 +14,9 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import status
 
+from django_tus.connection import get_schema_name
 from django_tus.models import TusFileModel
 from django_tus.response import Tus404, TusResponse
-from django_tus.schema import get_schema_name
 
 logger = logging.getLogger(__name__)
 

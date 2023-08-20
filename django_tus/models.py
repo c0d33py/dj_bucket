@@ -1,18 +1,19 @@
 import os
 import uuid
 
-from django.db import models
 from django.contrib.auth import get_user_model
 from django.contrib.contenttypes import models as ctype_models
 from django.contrib.contenttypes.fields import GenericForeignKey
-from django_tus.schema import get_schema_name
+from django.db import models
 
+from django_tus.connection import get_schema_name
 
 User = get_user_model()
 
 
 class AbstractUpload(models.Model):
-    ''' The model for a tus file metadata. '''
+    '''The model for a tus file metadata.'''
+
     guid = models.UUIDField(default=uuid.uuid4, unique=True, verbose_name='GUID')
     filename = models.CharField(max_length=255, blank=True)
     length = models.BigIntegerField(default=-1)
@@ -27,12 +28,10 @@ class AbstractUpload(models.Model):
 
 
 class TusFileModel(AbstractUpload):
-    ''' Default model for a tus file upload.'''
+    '''Default model for a tus file upload.'''
+
     uploaded_file = models.FileField(
-        upload_to=get_schema_name,
-        blank=True,
-        null=True,
-        max_length=255
+        upload_to=get_schema_name, blank=True, null=True, max_length=255
     )
     content_type = models.ForeignKey(
         ctype_models.ContentType,
@@ -42,15 +41,13 @@ class TusFileModel(AbstractUpload):
         blank=True,
     )
     object_id = models.PositiveIntegerField(null=True, blank=True)
-    content_object = GenericForeignKey(
-        "content_type",
-        "object_id"
-    )
+    content_object = GenericForeignKey("content_type", "object_id")
     user = models.ForeignKey(
         User,
         verbose_name='user that uploads the file',
         related_name='tusfilemodel',
-        blank=True, null=True,
+        blank=True,
+        null=True,
         on_delete=models.SET_NULL,
     )
 
