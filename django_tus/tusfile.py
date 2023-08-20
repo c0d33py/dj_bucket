@@ -57,9 +57,6 @@ class FilenameGenerator:
 
 
 class TusFile:
-    def get_storage(self):
-        return FileSystemStorage()
-
     def __init__(self, resource_id: str):
         self.resource_id = resource_id
         self.filename = cache.get("tus-uploads/{}/filename".format(resource_id))
@@ -195,13 +192,6 @@ class TusFile:
 
     def __str__(self):
         return "{} ({})".format(self.filename, self.resource_id)
-
-
-class TusInitFile:
-    def __init__(self, offset, chunk_size, content):
-        self.offset = offset
-        self.chunk_size = chunk_size
-        self.content = content
 
 
 class TusChunk:
