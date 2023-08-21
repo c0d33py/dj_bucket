@@ -1,5 +1,11 @@
 import random
 
+from cloudinary.models import CloudinaryField
+from cloudinary_storage.storage import (
+    RawMediaCloudinaryStorage,
+    VideoMediaCloudinaryStorage,
+)
+from cloudinary_storage.validators import validate_video
 from django.db import models
 from django.utils import timezone
 
@@ -30,6 +36,15 @@ class FileObject(models.Model):
         verbose_name="File ID",
         editable=False,
     )
+    video = models.ImageField(
+        upload_to='videos/',
+        blank=True,
+        storage=VideoMediaCloudinaryStorage(),
+        validators=[validate_video],
+    )
+    image = models.ImageField(
+        upload_to='images/', blank=True
+    )  # no need to set storage, field will use the default one
     filename = models.CharField(max_length=255, blank=True, verbose_name="File Name")
     length = models.BigIntegerField(default=-1, verbose_name="File Length")
     offset = models.BigIntegerField(default=0, verbose_name="Offset")
@@ -67,3 +82,7 @@ class FileObject(models.Model):
     def size_in_kb(self):
         """Return the size of the file in kilobytes."""
         return round(self.length / 1024, 2)
+
+
+class S3Object(models.Model):
+    file = CloudinaryField(resource_type='auto')
