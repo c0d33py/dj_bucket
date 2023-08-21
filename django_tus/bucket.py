@@ -1,10 +1,9 @@
-import os
-
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
 
 
-class S3Client:
+class S3MultipartUploader:
     def __init__(self, *args, **kwargs):
         self.bucket_name = settings.MINIO_STORAGE_MEDIA_BUCKET_NAME
         self.access_key = settings.MINIO_STORAGE_ACCESS_KEY
@@ -21,14 +20,15 @@ class S3Client:
             endpoint_url=self.endpoint_url,
         )
 
-    def generate_multipart_upload(self, resource_id, content_type):
+    def generate_multipart_upload(self, filename, content_type, metadata):
         # Initialize a multipart upload
         response = self.s3.create_multipart_upload(
             Bucket=self.bucket_name,
-            Key=resource_id,
+            Key=filename,
             ACL="public-read-write",
             ContentType=content_type,
             CacheControl="max-age=1000",
+            Metadata=metadata,
         )
         upload_id = response['UploadId']
 
@@ -57,14 +57,21 @@ class S3Client:
                     parts.append({'PartNumber': part_number, 'ETag': response['ETag']})
 
             return parts
-        except Exception as e:
-            return False, str(e)
+        except (BotoCoreError, ClientError) as e:
+            # Handle the exception here
+            print("Error uploading parts:", e)
+            return None
 
     def complete_upload(self, parts, upload_id, file_name):
-        completeResult = self.s3.complete_multipart_upload(
-            Bucket=self.bucket_name,
-            Key=file_name,
-            UploadId=upload_id,
-            MultipartUpload={'Parts': parts},
-        )
-        return completeResult
+        try:
+            completeResult = self.s3.complete_multipart_upload(
+                Bucket=self.bucket_name,
+                Key=file_name,
+                UploadId=upload_id,
+                MultipartUpload={'Parts': parts},
+            )
+            return completeResult
+        except (BotoCoreError, ClientError) as e:
+            # Handle the exception here
+            print("Error completing multipart upload:", e)
+            return None

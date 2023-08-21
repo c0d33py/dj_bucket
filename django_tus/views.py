@@ -69,10 +69,7 @@ class TusUpload(views.APIView):
                 reason="File with same name already exists",
             )
 
-        file_size = int(
-            request.META.get("HTTP_UPLOAD_LENGTH", "0")
-        )  # TODO: check min max upload size
-
+        file_size = int(request.META.get("HTTP_UPLOAD_LENGTH", "0"))
         tus_file = TusFile.create_initial_file(metadata, file_size)
 
         return TusResponse(
@@ -111,7 +108,7 @@ class TusUpload(views.APIView):
 
         if tus_file.is_complete():
             # file transfer complete, rename from resource id to actual filename
-            tus_file.rename()
+            tus_file.s3_object_upload()
             tus_file.clean()
 
             self.finished()
