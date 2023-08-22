@@ -144,9 +144,9 @@ TUS_EXISTING_FILE = 'random'  # Other options are: 'overwrite',  'error', 'renam
 # https://django-minio-storage.readthedocs.io/en/latest/usage/
 
 # global config
-# DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticHashedCloudinaryStorage'
+DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
+# DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+# STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticHashedCloudinaryStorage'
 
 # STATICFILES_STORAGE = "minio_storage.storage.MinioStaticStorage"
 MINIO_STORAGE_ENDPOINT = 'bucket.cb.media:9000'
