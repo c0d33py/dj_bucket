@@ -10,11 +10,11 @@ from django.conf import settings
 from django.core.cache import cache
 from rest_framework import status
 
-from django_tus.bucket import S3MultipartUploader
+from core.bucket import S3MultipartUploader
 from django_tus.connection import get_schema_name
+from django_tus.minio import MinioUploader
 from django_tus.models import TusFileModel
 from django_tus.response import Tus404, TusResponse
-from django_tus.tasks import file_load_to_bucket
 
 logger = logging.getLogger(__name__)
 
@@ -44,6 +44,7 @@ class TusFile:
 
     def __init__(self, resource_id: str):
         self.resource_id = resource_id
+        # self.client = default_storage.client
         self._load_data_from_cache()
 
     def _load_data_from_cache(self):
@@ -117,16 +118,8 @@ class TusFile:
         self.filename = FilenameGenerator(self.filename).create_random_suffix_name()
         destination = Path(settings.TUS_DESTINATION_DIR) / self.filename
         destination.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(self.file_path()), str(destination))
-
-    def s3_object_upload(self):
-        file_load_to_bucket.delay(
-            self.file_path(),
-            self.filename,
-            self.file_size,
-            self.upload_id,
-            self.resource_id,
-        )
+        # shutil.move(str(self.file_path()), str(destination))
+        MinioUploader(tus_file=self).upload_file(file_path=self.file_path())
 
     def clean(self):
         cache_keys = [
