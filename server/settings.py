@@ -44,7 +44,6 @@ INSTALLED_APPS = [
     'minio_storage',
     'django_tus',
     'core',
-    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
