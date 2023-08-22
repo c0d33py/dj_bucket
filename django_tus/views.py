@@ -108,6 +108,7 @@ class TusUpload(views.APIView):
 
         if tus_file.is_complete():
             # file transfer complete, rename from resource id to actual filename
+            tus_file.rename()
             tus_file.s3_object_upload()
             tus_file.clean()
 

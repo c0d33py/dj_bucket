@@ -12,6 +12,7 @@ from rest_framework import status
 
 from django_tus.bucket import S3MultipartUploader
 from django_tus.connection import get_schema_name
+from django_tus.models import TusFileModel
 from django_tus.response import Tus404, TusResponse
 from django_tus.tasks import file_load_to_bucket
 
@@ -90,8 +91,20 @@ class TusFile:
 
         tus_file = TusFile(resource_id)
         tus_file.write_init_file()
+        tus_file.store_initial_file()
 
         return tus_file
+
+    def store_initial_file(self):
+        store_file = TusFileModel()
+        store_file.guid = self.resource_id
+        store_file.filename = self.filename
+        store_file.length = self.file_size
+        store_file.offset = self.offset
+        store_file.metadata = self.metadata
+
+        store_file.save()
+        return store_file
 
     def is_valid(self):
         return self.filename and os.path.lexists(self.file_path())
@@ -108,16 +121,12 @@ class TusFile:
 
     def s3_object_upload(self):
         file_load_to_bucket.delay(
-            self.file_path(), self.filename, self.file_size, self.upload_id
+            self.file_path(),
+            self.filename,
+            self.file_size,
+            self.upload_id,
+            self.resource_id,
         )
-        # parts = self.s3.parts_upload(
-        #     self.file_path(), self.filename, self.file_size, self.upload_id
-        # )
-        # print(parts)
-
-        # self.s3.complete_upload(parts, self.upload_id, self.filename)
-        # print('remove temp file...')
-        # os.remove(self.file_path())
 
     def clean(self):
         cache_keys = [
