@@ -3,7 +3,6 @@ from django.views.generic import View
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 
-from .bucket import S3Client
 from .forms import PostForm
 from .metadata import CustomMetadata
 from .models import Post
@@ -53,11 +52,6 @@ class FileUploaderApi(APIView):
         file_size = int(request.META.get("HTTP_UPLOAD_LENGTH", "0"))
 
         file = FileResource.create_initial_file(metadata, file_size)
-
-        s3 = S3Client()
-
-        upload_id = s3.get_multipart_upload(file.resource_id, content_type)
-        print(upload_id)
 
         return TusResponse(
             status=status.HTTP_201_CREATED,
