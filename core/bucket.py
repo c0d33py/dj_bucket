@@ -1,10 +1,17 @@
-import os
+import logging
 
 import boto3
+from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
+from rest_framework import status
+from rest_framework.response import Response
+
+from django_tus.response import Tus404, TusResponse
+
+logger = logging.getLogger(__name__)
 
 
-class S3Client:
+class S3MultipartUploader:
     def __init__(self, *args, **kwargs):
         self.bucket_name = settings.MINIO_STORAGE_MEDIA_BUCKET_NAME
         self.access_key = settings.MINIO_STORAGE_ACCESS_KEY
@@ -21,20 +28,23 @@ class S3Client:
             endpoint_url=self.endpoint_url,
         )
 
-    def get_multipart_upload(self, resource_id, content_type):
+    def generate_multipart_upload(self, filename, content_type, metadata):
         # Initialize a multipart upload
         response = self.s3.create_multipart_upload(
             Bucket=self.bucket_name,
-            Key=resource_id,
+            Key=filename,
             ACL="public-read-write",
             ContentType=content_type,
             CacheControl="max-age=1000",
+            Metadata=metadata,
         )
         upload_id = response['UploadId']
 
         return upload_id
 
-    def upload_file(self, tmp_path, file_name, file_size, upload_id):
+    def parts_upload(
+        self, tmp_path: str, file_name: str, file_size: int, upload_id: str
+    ):
         try:
             # Determine part size and number of parts
             part_size = 5 * 1024 * 1024  # 5MB
@@ -43,7 +53,7 @@ class S3Client:
 
             # Upload parts
             parts = []
-            with open(str(tmp_path), 'r+b') as f:
+            with open(tmp_path, 'r+b') as f:
                 for part_number in range(1, num_parts + 1):
                     data = f.read(part_size)
 
@@ -57,14 +67,22 @@ class S3Client:
                     parts.append({'PartNumber': part_number, 'ETag': response['ETag']})
 
             return parts
-        except Exception as e:
-            return False, str(e)
+        except (BotoCoreError, ClientError) as e:
+            # Handle the exception here
+            print("Error uploading parts:", e)
+            return None
 
-    def get_complete_upload(self, parts, upload_id, file_name):
-        completeResult = self.s3.complete_multipart_upload(
-            Bucket=self.bucket_name,
-            Key=file_name,
-            UploadId=upload_id,
-            MultipartUpload={'Parts': parts},
-        )
-        return completeResult
+    def complete_upload(self, parts: list, upload_id: str, file_name: str):
+        try:
+            completeResult = self.s3.complete_multipart_upload(
+                Bucket=self.bucket_name,
+                Key=file_name,
+                UploadId=upload_id,
+                MultipartUpload={'Parts': parts},
+            )
+
+            return completeResult
+        except (BotoCoreError, ClientError) as e:
+            # Handle the exception here
+            print("Error completing multipart upload:", e)
+            return None
