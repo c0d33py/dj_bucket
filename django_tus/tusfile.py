@@ -13,6 +13,7 @@ from rest_framework import status
 from django_tus.bucket import S3MultipartUploader
 from django_tus.connection import get_schema_name
 from django_tus.response import Tus404, TusResponse
+from django_tus.tasks import file_load_to_bucket
 
 logger = logging.getLogger(__name__)
 
@@ -106,13 +107,17 @@ class TusFile:
         shutil.move(str(self.file_path()), str(destination))
 
     def s3_object_upload(self):
-        parts = self.s3.parts_upload(
+        file_load_to_bucket.delay(
             self.file_path(), self.filename, self.file_size, self.upload_id
         )
+        # parts = self.s3.parts_upload(
+        #     self.file_path(), self.filename, self.file_size, self.upload_id
+        # )
+        # print(parts)
 
-        self.s3.complete_upload(parts, self.upload_id, self.filename)
-
-        os.remove(self.file_path())
+        # self.s3.complete_upload(parts, self.upload_id, self.filename)
+        # print('remove temp file...')
+        # os.remove(self.file_path())
 
     def clean(self):
         cache_keys = [

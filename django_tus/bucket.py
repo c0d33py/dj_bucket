@@ -1,6 +1,14 @@
+import logging
+
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
+from rest_framework import status
+from rest_framework.response import Response
+
+from django_tus.response import Tus404, TusResponse
+
+logger = logging.getLogger(__name__)
 
 
 class S3MultipartUploader:
@@ -34,7 +42,9 @@ class S3MultipartUploader:
 
         return upload_id
 
-    def parts_upload(self, tmp_path, file_name, file_size, upload_id):
+    def parts_upload(
+        self, tmp_path: str, file_name: str, file_size: int, upload_id: str
+    ):
         try:
             # Determine part size and number of parts
             part_size = 5 * 1024 * 1024  # 5MB
@@ -43,7 +53,7 @@ class S3MultipartUploader:
 
             # Upload parts
             parts = []
-            with open(str(tmp_path), 'r+b') as f:
+            with open(tmp_path, 'r+b') as f:
                 for part_number in range(1, num_parts + 1):
                     data = f.read(part_size)
 
@@ -62,7 +72,7 @@ class S3MultipartUploader:
             print("Error uploading parts:", e)
             return None
 
-    def complete_upload(self, parts, upload_id, file_name):
+    def complete_upload(self, parts: list, upload_id: str, file_name: str):
         try:
             completeResult = self.s3.complete_multipart_upload(
                 Bucket=self.bucket_name,
@@ -70,6 +80,7 @@ class S3MultipartUploader:
                 UploadId=upload_id,
                 MultipartUpload={'Parts': parts},
             )
+
             return completeResult
         except (BotoCoreError, ClientError) as e:
             # Handle the exception here

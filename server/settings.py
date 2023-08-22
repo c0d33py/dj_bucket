@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'minio_storage',
     'django_tus',
     'core',
+    'django_celery_beat',
 ]
 
 MIDDLEWARE = [
@@ -196,3 +197,9 @@ CLOUDINARY_STORAGE = {
     'API_KEY': '183796315324614',
     'API_SECRET': 'Kimk5VV6XVfUdvdmuWpyolgux1k',
 }
+
+
+# Celery settings
+CELERY_BROKER_URL = "redis://localhost:6379"
+CELERY_RESULT_BACKEND = "redis://localhost:6379"
+broker_connection_retry_on_startup = True
