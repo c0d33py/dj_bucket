@@ -3,6 +3,8 @@ from django.views.generic import View
 from rest_framework import permissions, status
 from rest_framework.views import APIView
 
+from django_tus.models import TusFileModel
+
 from .forms import PostForm
 from .metadata import CustomMetadata
 from .models import Post
@@ -15,7 +17,7 @@ class PostView(View):
     form_class = PostForm
 
     def get(self, request):
-        post_query = Post.objects.all()
+        post_query = TusFileModel.objects.all()
         form = self.form_class()
 
         context = {'posts': post_query, 'form': form}
