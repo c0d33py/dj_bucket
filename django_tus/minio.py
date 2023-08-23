@@ -2,7 +2,6 @@ import os
 
 from django.conf import settings
 from django.core.files.storage import default_storage
-from tqdm import tqdm
 
 from django_tus.connection import get_schema_name
 from django_tus.models import TusFileModel
@@ -18,22 +17,28 @@ class MinioUploader:
 
     def upload_file(self, file_path):
         with open(file_path, 'rb') as file:
-            self.client.put_object(
-                self.bucket_name,
-                f'{get_schema_name()}/{self.filename}',
-                file,
-                length=-1,
-                part_size=10 * 1024 * 1024,
-            )
+            self._upload_to_minio(file)
 
         self._save_uploaded_file_data()
-        # Delete the file from the local file system
-        os.remove(file_path)
+        self._delete_local_file(file_path)
+
+    def _upload_to_minio(self, file):
+        object_key = f'{get_schema_name()}/{self.filename}'
+        self.client.put_object(
+            self.bucket_name,
+            object_key,
+            file,
+            length=-1,
+            part_size=10 * 1024 * 1024,
+        )
 
     def _save_uploaded_file_data(self):
-        # # Save the uploaded file data to a local file
         file_obj = TusFileModel.objects.get(guid=self.resource_id)
-        file_obj.uploaded_file = f'{get_schema_name()}/{self.filename}'
+        uploaded_file_path = f'{get_schema_name()}/{self.filename}'
+        file_obj.uploaded_file = uploaded_file_path
         file_obj.save()
 
-        print(f"Uploaded file data saved: {self.tus_file.filename}")
+        print(f"Uploaded file data saved: {self.filename}")
+
+    def _delete_local_file(self, file_path):
+        os.remove(file_path)
