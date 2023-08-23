@@ -31,7 +31,7 @@ class TusFileModel(AbstractUpload):
     '''Default model for a tus file upload.'''
 
     uploaded_file = models.FileField(
-        upload_to=get_schema_name, blank=True, null=True, max_length=255
+        upload_to=get_schema_name(), blank=True, null=True, max_length=255
     )
     content_type = models.ForeignKey(
         ctype_models.ContentType,
