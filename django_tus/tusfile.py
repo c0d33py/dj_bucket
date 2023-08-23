@@ -10,7 +10,6 @@ from django.conf import settings
 from django.core.cache import cache
 from rest_framework import status
 
-from core.bucket import S3MultipartUploader
 from django_tus.connection import get_schema_name
 from django_tus.minio import MinioUploader
 from django_tus.models import TusFileModel
@@ -40,11 +39,8 @@ class FilenameGenerator:
 
 
 class TusFile:
-    s3 = S3MultipartUploader()
-
     def __init__(self, resource_id: str):
         self.resource_id = resource_id
-        # self.client = default_storage.client
         self._load_data_from_cache()
 
     def _load_data_from_cache(self):
@@ -52,7 +48,6 @@ class TusFile:
         self.file_size = self._get_cache_value_as_int('file_size')
         self.metadata = cache.get(f'tus-uploads/{self.resource_id}/metadata')
         self.offset = cache.get(f'tus-uploads/{self.resource_id}/offset')
-        self.upload_id = cache.get(f'tus-uploads/{self.resource_id}/upload_id')
 
     def _get_cache_value_as_int(self, key):
         value = cache.get(f'tus-uploads/{self.resource_id}/{key}')
@@ -74,17 +69,11 @@ class TusFile:
         filename = metadata.get('filename')
         file_name = FilenameGenerator(filename).create_random_suffix_name()
 
-        content_type = metadata.get('filetype')
-        upload_id = TusFile.s3.generate_multipart_upload(
-            file_name, content_type, metadata
-        )
-
         cache_data = {
             'filename': file_name,
             'file_size': file_size,
             'offset': 0,
             'metadata': metadata,
-            'upload_id': upload_id,
         }
 
         for key, value in cache_data.items():
@@ -110,6 +99,10 @@ class TusFile:
     def is_valid(self):
         return self.filename and os.path.lexists(self.file_path())
 
+    @staticmethod
+    def get_file_path(resource_id):
+        return str(Path(settings.TUS_UPLOAD_DIR) / resource_id)
+
     def file_path(self):
         return str(Path(settings.TUS_UPLOAD_DIR) / self.resource_id)
 
@@ -127,7 +120,6 @@ class TusFile:
             'filename',
             'offset',
             'metadata',
-            'upload_id',
         ]
         cache.delete_many(
             [f'tus-uploads/{self.resource_id}/{key}' for key in cache_keys]
