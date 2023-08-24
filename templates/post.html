@@ -1,19 +1,16 @@
 {% extends 'base.html' %}
 {% block body %}
 
-<form action="." method="post" class="row row-cols-lg-auto g-3 align-items-center">
+<form enctype="multipart/form-data" method="post" id="uploadedfile_form" novalidate=""
+    class="row row-cols-lg-auto g-3 align-items-center">
     {% csrf_token %}
     <div class="col-12">
-        <input type="text" class="form-control" name="title" maxlength="100" id="id_title" placeholder="title">
-    </div>
-    <div class="col-12">
-        <input class="form-control" type="file" id="id_file">
+        {{ form.file }}
     </div>
     <div class="col-12">
         <button type="submit" class="btn btn-primary">Submit</button>
     </div>
 </form>
-
 
 <hr>
 

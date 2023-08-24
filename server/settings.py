@@ -41,6 +41,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'minio_storage',
     'django_tus',
+    'core',
+    's3_file_field',
 ]
 
 MIDDLEWARE = [
