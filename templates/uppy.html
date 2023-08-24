@@ -26,11 +26,8 @@
 
         const uppy = new Uppy({ debug: true, autoProceed: false })
             .use(Dashboard, { trigger: "#uppyModalOpener" })
-            // .use(Tus, { endpoint: "https://tusd.tusdemo.net/files/" })
-            .use(AwsS3, {
-                shouldUseMultipart: (file) => file.size > 100 * 2 ** 20,
-                companionUrl: 'https://bucket.cb.media:9000',
-            });
+            .use(Tus, { endpoint: "http://localhost:8000/upload/" })
+
 
         uppy.on("success", (fileCount) => {
             console.log(`${fileCount} files uploaded`);
