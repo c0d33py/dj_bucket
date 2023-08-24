@@ -36,14 +36,11 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
-    'cloudinary_storage',
     'django.contrib.staticfiles',
-    'cloudinary',
     'corsheaders',
     'rest_framework',
     'minio_storage',
     'django_tus',
-    'core',
 ]
 
 MIDDLEWARE = [
@@ -145,8 +142,6 @@ TUS_EXISTING_FILE = 'random'  # Other options are: 'overwrite',  'error', 'renam
 
 # global config
 DEFAULT_FILE_STORAGE = "minio_storage.storage.MinioMediaStorage"
-# DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-# STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticHashedCloudinaryStorage'
 
 # STATICFILES_STORAGE = "minio_storage.storage.MinioStaticStorage"
 MINIO_STORAGE_ENDPOINT = 'bucket.cb.media:9000'
@@ -188,13 +183,6 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
     ],
     'EXCEPTION_HANDLER': 'rest_framework.views.exception_handler',
-}
-
-
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': 'drrmwbyx7',
-    'API_KEY': '183796315324614',
-    'API_SECRET': 'Kimk5VV6XVfUdvdmuWpyolgux1k',
 }
 
 
