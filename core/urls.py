@@ -1,7 +1,13 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework import routers
 
-from . import views
+from . import rest
+from .views import home
+
+router = routers.DefaultRouter()
+router.register('resources', rest.UploadedFileViewSet, basename='api')
 
 urlpatterns = [
-    path('', views.home, name='home'),
+    path('', home, name='home'),
+    path('api/', include(router.urls)),
 ]
