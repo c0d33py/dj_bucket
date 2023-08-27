@@ -10,3 +10,4 @@ env
 .env
 tus_upload
 media/
+node_modules/

@@ -22,10 +22,10 @@ from django.views.generic import TemplateView
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('', include('django_tus.urls')),
+    # path('', include('django_tus.urls')),
     # path('', TemplateView.as_view(template_name='uppy.html')),
-    path('', include('core.urls')),
     path('api/s3-upload/', include('s3_file_field.urls')),
+    path('', include('core.urls')),
 ]
 
 if settings.DEBUG:
