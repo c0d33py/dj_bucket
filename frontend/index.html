@@ -24,24 +24,8 @@
             border-radius: 0.5em;
             text-align: center;
         }
-
-        input[type="file"] {
-            display: none;
-        }
-
-        label {
-            display: block;
-            position: relative;
-            background-color: #025bee;
-            color: #ffffff;
-            text-align: center;
-            width: 16em;
-            padding: 1em 0;
-            border-radius: 0.3em;
-            margin: 0 auto 1em auto;
-            cursor: pointer;
-        }
     </style>
+    <link rel="stylesheet" href="./uploader.css">
 </head>
 
 <body>
@@ -50,13 +34,12 @@
 
         <div class="uploader-wrapper">
             <div class="file-wrapper">
-                <label for="id_file" id="file-target">
+                <label for="id_file" id="file-target" class="upload-btn">
                     Choose Or Drop Files
                     <input type="file" id="id_file" name="file" accept="video/*" multiple style="display: none;">
                 </label>
             </div>
         </div>
-
     </div>
     <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js"
         integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r"
