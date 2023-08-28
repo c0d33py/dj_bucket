@@ -2,13 +2,14 @@
 {% load static %}
 
 {% block body %}
+<link rel="stylesheet" href="/static/uploader.css">
 <div class="row mb-3">
     <form enctype="multipart/form-data" method="post" class="row" id="uploadedfile_form">{% csrf_token %}
-        <div class="col-auto">
-            <input type="file" name="file[]" required="" id="id_file" multiple>
-        </div>
-        <div class="col-auto">
-            <button type="submit" class="btn btn-primary">Submit</button>
+        <div class="col-auto">{% csrf_token %}
+            <label for="id_file" id="file-target" class="upload-btn">
+                Choose Or Drop Files
+                <input type="file" id="id_file" name="file" accept="video/*" multiple style="display: none;">
+            </label>
         </div>
     </form>
     <div id="progress-bars"></div>
@@ -18,7 +19,8 @@
 
 {% block javascript %}
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-<script>
+<script src="{% static 'uploader.js' %}"></script>
+<!-- <script>
     const form = document.getElementById('uploadedfile_form');
     const fileInput = form.querySelector('input[type="file"]');
     const progressBarsContainer = document.getElementById('progress-bars');
@@ -170,5 +172,5 @@
 
         return progressBar;
     }
-</script>
+</script> -->
 {% endblock %}

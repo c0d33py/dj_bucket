@@ -1,25 +1,20 @@
 const uploadFiles = (() => {
-    const ENDPOINTS = {
-        UPLOAD: 'http://localhost:1234/upload',
-    }
     const defaultOptions = {
-        url: ENDPOINTS.UPLOAD,
-        startingByte: 0,
-        fileId: '',
-        onAbort() { },
-        onProgress() { },
-        onError() { },
-        onComplete() { }
-    };
+        url: '',
+        onAbort: () => { },
+        onError: () => { },
+        onProgress: () => { },
+        onCompleted: () => { },
+    }
 
     const uploadFile = (file, options) => {
         const formData = new FormData();
         formData.append('file', file, file.name);
 
         req = new XMLHttpRequest();
-        req.open('POST', ENDPOINTS.UPLOAD, true);
+        req.open('POST', options.url, true);
 
-        req.onload = (e) => options.onComplete(e, file);
+        req.onload = (e) => options.onCompleted(e, file);
 
         req.onerror = (e) => options.onError(e, file);
 
@@ -39,21 +34,22 @@ const uploadFiles = (() => {
 
 const uploadAndTrackFiles = (() => {
     const files = new Map();
-    const progressBox = document.createElement('div');
     const FILE_STATUS = {
         PENDING: 'pending',
         UPLOADING: 'uploading',
         PAUSED: 'paused',
         COMPLETED: 'completed',
-        FAILED: 'failed'
-    }
+        FAILED: 'failed',
+    };
 
+    const progressBox = document.createElement('div');
     progressBox.className = 'upload-progress-tracker';
     progressBox.innerHTML = `
-				<h3>Uploading 0 Files</h3>
+                <h3>Uploading 0 Files</h3>
 				<div class="uploads-progress-bar" style="width: 0;"></div>
 				<div class="file-progress-wrapper"></div>
-			`;
+        `;
+
 
     const updateFileElement = (fileObject) => {
         const fileDetails = fileObject.element.querySelector('.file-details');
@@ -92,55 +88,54 @@ const uploadAndTrackFiles = (() => {
         });
 
         progressBox.querySelector('.file-progress-wrapper').appendChild(fileElement);
-    }
-
-    const onComplete = (e, file) => {
-        const fileObj = files.get(file);
-        fileObj.status = FILE_STATUS.COMPLETED;
-        fileObj.percentage = 100;
-
-        updateFileElement(fileObj);
-    }
+    };
 
     const onProgress = (e, file) => {
         const fileObj = files.get(file);
-        fileObj.status = FILE_STATUS.UPLOADING;
-        fileObj.percentage = e.percentage;
 
+        fileObj.status = FILE_STATUS.UPLOADING;
+        fileObj.percentage = e.loaded / e.total * 100;
         updateFileElement(fileObj);
-    }
+    };
 
     const onError = (e, file) => {
         const fileObj = files.get(file);
+
         fileObj.status = FILE_STATUS.FAILED;
         fileObj.percentage = 100;
-
         updateFileElement(fileObj);
-    }
+    };
 
     const onAbort = (e, file) => {
         const fileObj = files.get(file);
-        fileObj.status = FILE_STATUS.PAUSED;
 
+        fileObj.status = FILE_STATUS.PAUSED;
         updateFileElement(fileObj);
-    }
+    };
+
+    const onCompleted = (e, file) => {
+        const fileObj = files.get(file);
+
+        fileObj.status = FILE_STATUS.COMPLETED;
+        fileObj.percentage = 100;
+        updateFileElement(fileObj);
+    };
 
     return (uploadedFiles) => {
-        [...uploadedFiles].forEach(setFileElement);
+        [...uploadedFiles].forEach(setFileElement)
 
-        document.body.appendChild(progressBox);
-
-        uploader = uploadFiles(uploadedFiles, {
-            onProgress,
-            onError,
+        uploadFiles(uploadedFiles, {
+            url: 'http://localhost:1234/upload',
+            onCompleted,
             onAbort,
-            onComplete
+            onError,
+            onProgress,
         });
+        document.body.appendChild(progressBox);
     }
 })();
 
 const fileInput = document.getElementById('id_file');
-
 fileInput.addEventListener('change', e => {
     uploadAndTrackFiles(e.currentTarget.files)
     e.currentTarget.value = '';
