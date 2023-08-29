@@ -11,7 +11,7 @@ const uploadFiles = (() => {
         const formData = new FormData();
         formData.append('file', file, file.name);
 
-        req = new XMLHttpRequest();
+        const req = new XMLHttpRequest();
         req.open('POST', options.url, true);
 
         req.onload = (e) => options.onCompleted(e, file);
