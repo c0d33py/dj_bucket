@@ -12,4 +12,4 @@ def home(request):
     #         return JsonResponse({'message': 'success'})
     # else:
     #     form = UploadedFileForm()
-    return render(request, 'post.html', {'form': 'form'})
+    return render(request, 'django_file_field.html', {'form': 'form'})
