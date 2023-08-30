@@ -16,5 +16,174 @@
 
 {% block javascript %}
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script>
+    const FileState = {
+        Aborted: 0,
+        Successful: 1,
+        Error: 2
+    };
 
+    const ProgressState = {
+        Initializing: 0,
+        Sending: 1,
+        Finalizing: 2,
+        Done: 3
+    };
+
+    class S3FileFieldClient {
+        constructor(options) {
+            const { baseUrl, apiConfig = {}, onProgress } = options;
+            this.api = axios.create({
+                ...apiConfig,
+                baseURL: baseUrl.replace(/\/?$/, '/')
+            });
+            this.onProgress = onProgress;
+        }
+
+        async initializeUpload(file, fieldId) {
+            const response = await this.api.post('upload-initialize/', {
+                field_id: fieldId,
+                file_name: file.name,
+                file_size: file.size
+            });
+            return response.data;
+        }
+
+        async uploadParts(file, parts) {
+            const uploadedParts = [];
+            let fileOffset = 0;
+            for (const part of parts) {
+                const chunk = file.slice(fileOffset, fileOffset + part.size);
+                const response = await this.api.put(part.upload_url, chunk, {
+                    onUploadProgress: (e) => {
+                        this.onProgress({
+                            uploaded: fileOffset + e.loaded,
+                            total: file.size,
+                            state: ProgressState.Sending,
+                            name: file.name
+                        });
+                    }
+                });
+                uploadedParts.push({
+                    part_number: part.part_number,
+                    size: part.size,
+                    etag: response.headers.etag
+                });
+                fileOffset += part.size;
+            }
+            return uploadedParts;
+        }
+
+        async completeUpload(multipartInfo, parts) {
+            const response = await this.api.post('upload-complete/', {
+                upload_signature: multipartInfo.upload_signature,
+                upload_id: multipartInfo.upload_id,
+                parts
+            });
+
+            const { complete_url: completeUrl, body } = response.data;
+            await axios.post(completeUrl, body, {
+                headers: { 'Content-Type': null }
+            });
+        }
+
+        async finalize(multipartInfo) {
+            const response = await this.api.post('finalize/', {
+                upload_signature: multipartInfo.upload_signature
+            });
+            return response.data.field_value;
+        }
+
+        async uploadFile(file, fieldId) {
+            this.onProgress({ state: ProgressState.Initializing, name: file.name });
+            const multipartInfo = await this.initializeUpload(file, fieldId);
+            this.onProgress({ state: ProgressState.Sending, uploaded: 0, total: file.size, name: file.name });
+            const parts = await this.uploadParts(file, multipartInfo.parts);
+            this.onProgress({ state: ProgressState.Finalizing, name: file.name });
+            await this.completeUpload(multipartInfo, parts);
+            const value = await this.finalize(multipartInfo);
+            this.onProgress({ state: ProgressState.Done, name: file.name });
+            return { value, state: FileState.Successful };
+        }
+    }
+
+    class FileUploader {
+        constructor(options) {
+            this.fileInput = document.getElementById('id_file');
+            this.csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            this.apiClient = axios.create({
+                headers: { 'X-CSRFToken': this.csrftoken }
+            });
+            this.progressBox = document.querySelector('.upload-progress-tracker') || this.createProgressBox();
+        }
+
+        createProgressBox() {
+            const progressBox = document.createElement('div');
+            progressBox.className = 'upload-progress-tracker';
+            progressBox.innerHTML = `
+                <h3>Uploading 0 Files</h3>
+                <div class="file-progress-wrapper"></div>
+            `;
+            document.body.appendChild(progressBox);
+            return progressBox;
+        }
+
+        setFileElement(file) {
+            const extIndex = file.name.lastIndexOf('.');
+            const fileElement = document.createElement('div');
+            fileElement.className = 'file-progress';
+            fileElement.dataset.file = file.name;
+            fileElement.innerHTML = `
+            <div class="file-details" style="position: relative">
+                <p>
+                    <span class="status">pending</span>
+                    <span class="file-name">${file.name.substring(0, extIndex)}</span>
+                    <span class="file-ext">${file.name.substring(extIndex)}</span>
+                </p>
+                <div class="progress-bar" style="width: 0;"></div>
+            </div>
+            `;
+            this.progressBox.querySelector('.file-progress-wrapper').appendChild(fileElement);
+        }
+
+        trackUploadedFiles(uploadedFiles) {
+            [...uploadedFiles].forEach((file) => this.setFileElement(file));
+            this.s3ffClient = new S3FileFieldClient({
+                baseUrl: 'http://localhost:8000/api/s3-upload/',
+                onProgress: updateProgress,
+            });
+
+            [...uploadedFiles].forEach(async (file) => {
+                const { state } = await this.s3ffClient.uploadFile(file, 'core.UploadedFile.file');
+                if (state === FileState.Successful) {
+                    console.log(`Uploaded file ${file.name} successfully.`);
+                }
+            });
+        }
+    }
+
+    function updateProgress(progress) {
+        const fileElement = document.querySelector(`[data-file="${progress.name}"]`);
+        const progressBar = fileElement.querySelector('.progress-bar');
+        const status = fileElement.querySelector('.status');
+
+        if (progress.state === 1) {
+            const progressPercent = Math.round((progress.uploaded / progress.total) * 100);
+            progressBar.style.width = `${progressPercent}%`;
+            status.textContent = `${progressPercent}%`;
+            status.className = 'status uploading';
+        }
+
+        if (progress.state === 3) {
+            status.className = 'status completed';
+        }
+    }
+
+    const fileInput = document.getElementById('id_file');
+    fileInput.addEventListener('change', (e) => {
+        const fileUploadTracker = new FileUploader();
+        fileUploadTracker.trackUploadedFiles(e.currentTarget.files);
+        e.currentTarget.value = '';
+    });
+</script>
 {% endblock %}
