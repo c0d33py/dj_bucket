@@ -43,12 +43,10 @@
                 const chunk = file.slice(fileOffset, fileOffset + part.size);
                 const response = await this.api.put(part.upload_url, chunk, {
                     onUploadProgress: (e) => {
-                        const loaded = e.loaded;
                         this.onProgress({
                             ...e,
-                            loaded,
                             total: file.size,
-                            percentage: fileOffset + e.loaded,
+                            loaded: fileOffset + e.loaded,
                         }, file);
                     }
                 });
@@ -201,7 +199,7 @@
                 return;
             }
             fileObj.status = this.FILE_STATUS.UPLOADING;
-            fileObj.percentage = (e.loaded / e.total) * 100;
+            fileObj.percentage = Math.round((e.loaded / e.total) * 100);
             this.updateFileElement(fileObj);
         };
 
