@@ -5,10 +5,7 @@
 <link rel="stylesheet" href="/static/uploader.css">
 <div class="row mb-3">
     <form enctype="multipart/form-data" method="post" class="row" id="uploadedfile_form">{% csrf_token %}
-        <label for="id_file" id="file-target" class="upload-btn">
-            Choose Or Drop Files
-            <input type="file" id="id_file" name="file" accept="video/*" multiple style="display: none;">
-        </label>
+        <div id="userSpecifiedDiv"></div>
     </form>
 </div>
 
@@ -91,7 +88,7 @@
                 const parts = await this.uploadParts(file, multipartInfo.parts);
                 await this.completeUpload(multipartInfo, parts);
                 const value = await this.finalize(multipartInfo);
-                this.onCompleted(file)
+                return value;
             } catch (e) {
                 console.error('Error uploading file:', e.message);
                 this.onError(e, file);
@@ -100,7 +97,10 @@
     }
 
     class FileUploader {
-        constructor() {
+        constructor(divId) {
+            this.fileInput = null;
+            this.section = document.getElementById(divId);
+            this.progressBox = this.createProgressBox();
             this.files = new Map();
             this.FILE_STATUS = {
                 PENDING: 'pending',
@@ -109,7 +109,37 @@
                 COMPLETED: 'completed',
                 FAILED: 'failed',
             };
-            this.progressBox = this.createProgressBox();
+            this.uploadedFileId = [];
+        }
+
+        init(options = {}) {
+            this.options = options;
+            this.configureFileInput();
+            this.fileInput.addEventListener('change', this.trackUploadedFiles.bind(this));
+        }
+
+        configureFileInput() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.id = 'id_file';
+            input.name = 'file';
+            input.style.display = 'none';
+            input.setAttribute('accept', this.options.fileAccept || 'image/*');
+            if (this.options.multiple) {
+                input.multiple = true;
+            }
+            const label = document.createElement('label');
+            label.htmlFor = input.id;
+            label.id = 'file-target';
+            label.className = 'upload-btn';
+            label.textContent = this.options.title || 'Upload File';
+
+            label.appendChild(input);
+
+            const specifiedDiv = this.section;
+            specifiedDiv.appendChild(label);
+
+            this.fileInput = input;
         }
 
         createProgressBox() {
@@ -120,7 +150,7 @@
                 <div class="file-progress-wrapper"></div>
             `;
             return progressBox;
-        }
+        };
 
         updateFileElement(fileObject) {
             const fileDetails = fileObject.element.querySelector('.file-details');
@@ -140,7 +170,7 @@
                             ? 'red'
                             : '#222';
             });
-        }
+        };
 
         setFileElement(file) {
             const extIndex = file.name.lastIndexOf('.');
@@ -163,7 +193,7 @@
                 percentage: 0,
             });
             this.progressBox.querySelector('.file-progress-wrapper').appendChild(fileElement);
-        }
+        };
 
         onProgress(e, file) {
             const fileObj = this.files.get(file);
@@ -173,7 +203,7 @@
             fileObj.status = this.FILE_STATUS.UPLOADING;
             fileObj.percentage = (e.loaded / e.total) * 100;
             this.updateFileElement(fileObj);
-        }
+        };
 
         onError(e, file) {
             const fileObj = this.files.get(file);
@@ -181,7 +211,7 @@
             fileObj.status = this.FILE_STATUS.FAILED;
             fileObj.percentage = 100;
             this.updateFileElement(fileObj);
-        }
+        };
 
         onCompleted(file) {
             const fileObj = this.files.get(file);
@@ -189,11 +219,10 @@
             fileObj.status = this.FILE_STATUS.COMPLETED;
             fileObj.percentage = 100;
             this.updateFileElement(fileObj);
-        }
+        };
 
-        trackUploadedFiles(uploadedFiles) {
-            [...uploadedFiles].forEach((file) => this.setFileElement(file));
-
+        trackUploadedFiles(event) {
+            const uploadedFiles = event.target.files;
             this.s3ffClient = new S3FileFieldClient({
                 baseUrl: 'http://localhost:8000/api/s3-upload/',
                 onCompleted: (e, file) => this.onCompleted(e, file),
@@ -202,19 +231,41 @@
             });
 
             [...uploadedFiles].forEach(async (file) => {
-                await this.s3ffClient.uploadFile(file, 'core.UploadedFile.file');
-            });
+                this.setFileElement(file);
+                const fieldValue = await this.s3ffClient.uploadFile(file, 'core.UploadedFile.file');
 
+                if (fieldValue) {
+                    const apiPath = 'http://localhost:8000/api/resources/';
+
+                    (async () => {
+                        try {
+                            const response = await this.s3ffClient.api.post(apiPath, {
+                                file: fieldValue,
+                            });
+                            const dataId = response.data.id;
+                            this.uploadedFileId.push(dataId);
+
+                            this.onCompleted(file);
+                        } catch (error) {
+                            this.onError(error, file);
+                            console.error('Error uploading file:', error.message);
+                        }
+                    })();
+                }
+            });
             document.body.appendChild(this.progressBox);
+        };
+
+        getUploadedFileId() {
+            return this.uploadedFileId;
         }
     }
-
-    const fileInput = document.getElementById('id_file');
-    const fileUploadTracker = new FileUploader();
-
-    fileInput.addEventListener('change', (e) => {
-        fileUploadTracker.trackUploadedFiles(e.currentTarget.files);
-        e.currentTarget.value = '';
+    const upload = new FileUploader('userSpecifiedDiv');
+    upload.init({
+        fileAccept: '*/*',
+        multiple: true,
+        title: 'Upload Files',
     });
+
 </script>
 {% endblock %}
