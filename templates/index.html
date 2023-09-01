@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+{% load static %}
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite App</title>
+    <link rel="stylesheet" href="{% static 's3load/dist/style.css' %}">
+</head>
+
+<body>
+    <div id="app">
+        <div id="userSpecifiedDiv"></div>
+
+    </div>
+
+    <script type="module">
+        import { FileUploader } from '/static/s3load/dist/js/s3field.js'
+
+        // Initialization
+        const headers = {
+            'X-CSRFToken': '{{ csrf_token }}',
+        };
+
+        const upload = new FileUploader('userSpecifiedDiv');
+        upload.init({
+            setSignedUrl: 'http://localhost:8000/api/s3-upload/',
+            setStorageUrl: 'http://localhost:8000/api/resources/',
+            setModelsName: 'core.UploadedFile.file',
+            setHeaders: headers,
+            fileAccept: '*/*',
+            multiple: true,
+            btnTitle: 'Upload Files',
+        });
+    </script>
+
+</body>
+
+</html>
