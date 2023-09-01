@@ -1,10 +1,9 @@
+import '../assets/style.css';
 import { S3FileFieldClient } from './client.js'
 
 export class FileUploader {
     constructor(divId) {
-        this.fileInput = null;
-        this.section = document.getElementById(divId);
-        this.progressBox = this.createProgressBox();
+        this.divId = divId;
         this.files = new Map();
         this.FILE_STATUS = {
             PENDING: 'pending',
@@ -14,15 +13,17 @@ export class FileUploader {
             FAILED: 'failed',
         };
         this.uploadedFileId = [];
+        this.progressBox = this.createProgressBox();
     }
 
     init(options = {}) {
         this.options = options;
-        this.configureFileInput();
-        this.fileInput.addEventListener('change', this.trackUploadedFiles.bind(this));
+        this.section = document.getElementById(this.divId);
+        this.createFileInput();
+        this.setupFileInputEventListeners();
     }
 
-    configureFileInput() {
+    createFileInput() {
         const input = document.createElement('input');
         input.type = 'file';
         input.id = 'id_file';
@@ -36,7 +37,7 @@ export class FileUploader {
         label.htmlFor = input.id;
         label.id = 'file-target';
         label.className = 'upload-btn';
-        label.textContent = this.options.title || 'Upload File';
+        label.textContent = this.options.btn_title || 'Upload File';
 
         label.appendChild(input);
 
@@ -44,6 +45,12 @@ export class FileUploader {
         specifiedDiv.appendChild(label);
 
         this.fileInput = input;
+    }
+
+    setupFileInputEventListeners() {
+        this.fileInput.addEventListener('change', (e) => {
+            this.trackUploadedFiles(e);
+        });
     }
 
     createProgressBox() {
@@ -128,11 +135,11 @@ export class FileUploader {
     trackUploadedFiles(event) {
         const uploadedFiles = event.target.files;
         this.s3ffClient = new S3FileFieldClient({
-            baseUrl: this.options.s3baseUrl,
+            baseUrl: this.options.setSignedUrl,
             onCompleted: (e, file) => this.onCompleted(e, file),
             onError: (e, file) => this.onError(e, file),
             onProgress: (e, file) => this.onProgress(e, file),
-            apiConfig: this.options.apiConfig || {},
+            apiConfig: this.options.setHeaders || {},
 
         });
 
@@ -140,13 +147,13 @@ export class FileUploader {
             this.setFileElement(file);
             const fieldValue = await this.s3ffClient.uploadFile(
                 file,
-                this.options.modelPoint,
+                this.options.setModelsName,
             );
 
             if (fieldValue) {
                 (async () => {
                     try {
-                        const response = await this.s3ffClient.api.post(this.options.finalPath, {
+                        const response = await this.s3ffClient.api.post(this.options.setStorageUrl, {
                             file: fieldValue,
                         });
                         const dataId = response.data.id;
@@ -167,5 +174,3 @@ export class FileUploader {
         return this.uploadedFileId;
     }
 }
-
-export default FileUploader;

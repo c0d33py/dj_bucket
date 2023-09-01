@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <!-- 1. Add CSS to `<head>` -->
+    <link href="https://releases.transloadit.com/uppy/v3.14.0/uppy.min.css" rel="stylesheet">
+</head>
+
+<body>
+    <!-- 2. Initialize -->
+    <div id="uppy"></div>
+
+    <!-- 3. Add JS to end of body -->
+    <script type="module">
+        import { Uppy, Dashboard, AwsS3 } from "https://releases.transloadit.com/uppy/v3.14.0/uppy.min.mjs"
+        const uppy = new Uppy()
+        uppy.use(Dashboard, { target: '#uppy', inline: true })
+        uppy.use(AwsS3, {
+            shouldUseMultipart: (file) => file.size > 100 * 2 ** 20,
+            companionUrl: 'http://localhost:8000/api/s3-upload/',
+        })
+    </script>
+</body>
+
+</html>
